@@ -389,7 +389,7 @@
   </div>
 </div>
 
-<div class="footer">※ CoinGecko API より取得。15秒ごと自動更新。投資アドバイスではありません。</div>
+<div class="footer">※ CoinGecko API より取得。60秒ごと自動更新。投資アドバイスではありません。</div>
 <div class="toast" id="toast"></div>
 
 <script>
@@ -406,6 +406,13 @@ let refreshTimer = null;
 let candleLabels = [];
 let usingFallbackPrice = false;
 let usingFallbackHistory = false;
+let usingCachedPrice = false;
+let usingCachedHistory = false;
+
+const PRICE_CACHE_KEY = 'btc_price_cache_v2';
+const HISTORY_CACHE_KEY = 'btc_history_cache_v2';
+const PRICE_CACHE_MAX_AGE = 30 * 60 * 1000;
+const HISTORY_CACHE_MAX_AGE = 6 * 60 * 60 * 1000;
 
 const FALLBACK_PRICE = {
   jpy: 10450000,
@@ -451,6 +458,8 @@ function updateDataBanner() {
   if (!banner) return;
 
   const messages = [];
+  if (usingCachedPrice) messages.push('価格APIに接続できないため、直近成功データを表示しています。');
+  if (usingCachedHistory) messages.push('履歴APIに接続できないため、直近成功チャートを表示しています。');
   if (usingFallbackPrice) messages.push('価格APIに接続できないため、参考値で表示しています。');
   if (usingFallbackHistory) messages.push('履歴APIに接続できないため、参考チャートで表示しています。');
 
@@ -482,6 +491,23 @@ function saveRiskSettings() {
       balance: Math.max(0, Math.round(balance)),
       riskPct: clamp(riskPct, 0.1, 5)
     }));
+  } catch (e) {}
+}
+
+function readCache(key, maxAge) {
+  try {
+    const cached = JSON.parse(localStorage.getItem(key) || 'null');
+    if (!cached || !cached.savedAt) return null;
+    if (Date.now() - cached.savedAt > maxAge) return null;
+    return cached;
+  } catch (e) {
+    return null;
+  }
+}
+
+function writeCache(key, payload) {
+  try {
+    localStorage.setItem(key, JSON.stringify({ ...payload, savedAt: Date.now() }));
   } catch (e) {}
 }
 
@@ -555,6 +581,7 @@ function updateSafetyPanel() {
 
   let score = 70;
   if (usingFallbackPrice || usingFallbackHistory) score -= 18;
+  else if (usingCachedPrice || usingCachedHistory) score -= 8;
   if (direction === 'neutral') score -= 24;
   else score += 8;
   if (rsi > 72 || rsi < 28) score -= 16;
@@ -590,7 +617,7 @@ function updateSafetyPanel() {
   setSafetyText('safety-size', direction === 'neutral' ? '--' : size.toFixed(5) + ' BTC');
 
   const reasons = [
-    ['データ', usingFallbackPrice || usingFallbackHistory ? '参考値あり' : 'リアルタイム'],
+    ['データ', usingFallbackPrice || usingFallbackHistory ? '参考値あり' : usingCachedPrice || usingCachedHistory ? '直近成功データ' : 'リアルタイム'],
     ['トレンド', directionLabel + ' (' + trendScore + ')'],
     ['過熱感', 'RSI ' + rsi.toFixed(1)],
     ['ボラ', 'ATR ' + atrPct.toFixed(2) + '%'],
@@ -641,53 +668,58 @@ async function fetchWithFallback(path, retries = 2) {
   }
 }
 
+function applyPriceData(btc, source = 'live') {
+  currentPrice = btc.jpy;
+  document.getElementById('price').textContent = fmt(btc.jpy);
+
+  const chg = btc.jpy_24h_change || 0;
+  const chgEl = document.getElementById('change');
+  chgEl.textContent = (chg >= 0 ? '+' : '') + chg.toFixed(2) + '%  24h';
+  chgEl.className = 'metric-sub ' + (chg >= 0 ? 'up' : 'down');
+
+  document.getElementById('high').textContent = fmt(btc.jpy_24h_high);
+  document.getElementById('low').textContent = fmt(btc.jpy_24h_low);
+
+  const vol = btc.jpy_24h_vol || 0;
+  document.getElementById('volume').textContent = vol && btc.jpy ? (vol / btc.jpy).toFixed(1) : '--';
+  volumeHistory = [...volumeHistory.slice(-19), vol || 0];
+
+  const now = new Date();
+  const suffix = source === 'cached' ? ' キャッシュ' : source === 'fallback' ? ' 参考値' : ' 更新';
+  document.getElementById('last-updated').textContent = now.getHours() + ':' + String(now.getMinutes()).padStart(2, '0') + ':' + String(now.getSeconds()).padStart(2, '0') + suffix;
+
+  usingFallbackPrice = source === 'fallback';
+  usingCachedPrice = source === 'cached';
+  updateDataBanner();
+  updateSafetyPanel();
+  checkAlerts(currentPrice);
+}
+
 async function fetchPrice() {
   try {
-    const data = await fetchWithFallback('/simple/price?ids=bitcoin&vs_currencies=jpy&include_24hr_change=true&include_24hr_vol=true&include_24hr_high=true&include_24hr_low=true');
-    const btc = data.bitcoin;
+    const data = await fetchWithFallback('/coins/markets?vs_currency=jpy&ids=bitcoin&order=market_cap_desc&per_page=1&page=1&sparkline=false&price_change_percentage=24h');
+    const market = Array.isArray(data) ? data[0] : null;
+    const btc = market ? {
+      jpy: market.current_price,
+      jpy_24h_change: market.price_change_percentage_24h || 0,
+      jpy_24h_vol: market.total_volume || 0,
+      jpy_24h_high: market.high_24h,
+      jpy_24h_low: market.low_24h
+    } : null;
     if (!btc) throw new Error('no data');
 
-    currentPrice = btc.jpy;
-    document.getElementById('price').textContent = fmt(btc.jpy);
-
-    const chg = btc.jpy_24h_change;
-    const chgEl = document.getElementById('change');
-    chgEl.textContent = (chg >= 0 ? '+' : '') + chg.toFixed(2) + '%  24h';
-    chgEl.className = 'metric-sub ' + (chg >= 0 ? 'up' : 'down');
-
-    document.getElementById('high').textContent = fmt(btc.jpy_24h_high);
-    document.getElementById('low').textContent = fmt(btc.jpy_24h_low);
-
-    const vol = btc.jpy_24h_vol;
-    document.getElementById('volume').textContent = vol ? (vol / btc.jpy).toFixed(1) : '--';
-    volumeHistory = [...volumeHistory.slice(-19), vol || 0];
-
-    const now = new Date();
-    document.getElementById('last-updated').textContent = now.getHours() + ':' + String(now.getMinutes()).padStart(2, '0') + ':' + String(now.getSeconds()).padStart(2, '0') + ' 更新';
-
-    usingFallbackPrice = false;
-    updateDataBanner();
-    updateSafetyPanel();
-    checkAlerts(btc.jpy);
+    writeCache(PRICE_CACHE_KEY, { btc });
+    applyPriceData(btc, 'live');
   } catch (e) {
     console.error('fetchPrice error:', e);
 
-    currentPrice = FALLBACK_PRICE.jpy;
-    document.getElementById('price').textContent = fmt(FALLBACK_PRICE.jpy);
+    const cached = readCache(PRICE_CACHE_KEY, PRICE_CACHE_MAX_AGE);
+    if (cached && cached.btc) {
+      applyPriceData(cached.btc, 'cached');
+      return;
+    }
 
-    const chg = FALLBACK_PRICE.jpy_24h_change;
-    const chgEl = document.getElementById('change');
-    chgEl.textContent = (chg >= 0 ? '+' : '') + chg.toFixed(2) + '%  24h';
-    chgEl.className = 'metric-sub ' + (chg >= 0 ? 'up' : 'down');
-
-    document.getElementById('high').textContent = fmt(FALLBACK_PRICE.jpy_24h_high);
-    document.getElementById('low').textContent = fmt(FALLBACK_PRICE.jpy_24h_low);
-    document.getElementById('volume').textContent = (FALLBACK_PRICE.jpy_24h_vol / FALLBACK_PRICE.jpy).toFixed(1);
-
-    usingFallbackPrice = true;
-    updateDataBanner();
-    updateSafetyPanel();
-    checkAlerts(currentPrice);
+    applyPriceData(FALLBACK_PRICE, 'fallback');
   }
 }
 
@@ -711,14 +743,30 @@ async function fetchHistory() {
     });
     candleLabels = labels;
 
+    writeCache(HISTORY_CACHE_KEY + '_' + currentTF, { priceHistory, labels });
     renderPriceChart(labels);
     renderCandlestickChart();
     renderMacdChart();
     usingFallbackHistory = false;
+    usingCachedHistory = false;
     updateDataBanner();
     updateIndicators();
   } catch (e) {
     console.error('fetchHistory error:', e);
+
+    const cached = readCache(HISTORY_CACHE_KEY + '_' + currentTF, HISTORY_CACHE_MAX_AGE);
+    if (cached && Array.isArray(cached.priceHistory) && cached.priceHistory.length && Array.isArray(cached.labels)) {
+      priceHistory = cached.priceHistory;
+      candleLabels = cached.labels;
+      renderPriceChart(cached.labels);
+      renderCandlestickChart();
+      renderMacdChart();
+      usingFallbackHistory = false;
+      usingCachedHistory = true;
+      updateDataBanner();
+      updateIndicators();
+      return;
+    }
 
     priceHistory = buildFallbackHistory(currentPrice || FALLBACK_PRICE.jpy);
     const labels = priceHistory.map((_, i) => {
@@ -731,6 +779,7 @@ async function fetchHistory() {
     renderCandlestickChart();
     renderMacdChart();
     usingFallbackHistory = true;
+    usingCachedHistory = false;
     updateDataBanner();
     updateIndicators();
   }
@@ -908,6 +957,7 @@ function updateIndicators() {
     bbDev > 0.2 ? 1 : bbDev < -0.2 ? -1 : 0
   ].reduce((sum, value) => sum + value, 0);
   const dataIsFallback = usingFallbackPrice || usingFallbackHistory;
+  const dataIsCached = usingCachedPrice || usingCachedHistory;
   const trendLabel = trendScore >= 3 ? '上昇優勢' : trendScore <= -3 ? '下落優勢' : trendScore > 0 ? 'やや上向き' : trendScore < 0 ? 'やや下向き' : '中立';
   const rsiLabel = rsi >= 70 ? '過熱' : rsi <= 30 ? '売られ過ぎ' : rsi >= 60 ? '高め' : rsi <= 40 ? '低め' : '中立';
   const volLabel = vol > 1.2 ? '高い' : vol > 0.7 ? 'やや高い' : '通常';
@@ -924,6 +974,11 @@ function updateIndicators() {
     verdictText = '参考値が混ざっています。実トレード判断には使わず、API復旧後のリアルタイム表示を待つ状態です。';
     nextCheck = '価格と履歴の両方がリアルタイム表示へ戻ってから再判定。';
     summaryClass = 'summary-risk';
+  } else if (dataIsCached) {
+    verdict = '直近データ表示・新規判断は慎重';
+    verdictText = 'API取得に失敗したため、直近成功データで表示しています。固定の参考値より信頼できますが、最新価格との差に注意が必要です。';
+    nextCheck = '更新ボタンでリアルタイム取得に戻るか確認し、戻るまでは数量を落とす。';
+    summaryClass = 'summary-neutral';
   } else if (rsi >= 72) {
     verdict = '過熱・新規買いは待ち';
     verdictText = 'RSIが高く、短期の上値追いは不利になりやすい状態です。押し目か横ばい調整を待つ方が安全です。';
@@ -967,6 +1022,7 @@ function updateIndicators() {
 
   const flags = [];
   if (dataIsFallback) flags.push('参考値あり');
+  if (dataIsCached) flags.push('直近成功データ');
   if (nearResistance) flags.push('レジスタンス近い');
   if (nearSupport) flags.push('サポート近い');
   if (volChange > 10) flags.push('出来高拡大');
@@ -1287,7 +1343,7 @@ async function refreshAll() {
 
 function startAutoRefresh() {
   if (refreshTimer) clearInterval(refreshTimer);
-  refreshTimer = setInterval(fetchPrice, 15000);
+  refreshTimer = setInterval(fetchPrice, 60000);
 }
 
 // init
