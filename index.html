@@ -219,10 +219,7 @@
 <div class="toast" id="toast"></div>
 
 <script>
-const PROXY_URLS = [
-  'https://api.coingecko.com/api/v3',
-  'https://api.coingecko.com/api/v3'
-];
+const API_BASE = 'https://api.coingecko.com/api/v3';
 
 let priceHistory = [];
 let currentTF = '5m';
@@ -246,13 +243,35 @@ function fmtSmall(n) {
 }
 
 async function fetchWithFallback(path) {
-  const url = PROXY_URLS[0] + path;
-  const res = await fetch(url, {
-    headers: { 'Accept': 'application/json' },
-    cache: 'no-store'
-  });
-  if (!res.ok) throw new Error('HTTP ' + res.status);
-  return res.json();
+  const controller = new AbortController();
+
+  const timeout = setTimeout(() => {
+    controller.abort();
+  }, 10000);
+
+  try {
+    const res = await fetch(API_BASE + path, {
+      headers: {
+        'Accept': 'application/json'
+      },
+      cache: 'no-store',
+      signal: controller.signal
+    });
+
+    if (!res.ok) {
+      throw new Error(`HTTP ${res.status}`);
+    }
+
+    return await res.json();
+
+  } catch (e) {
+    if (e.name === 'AbortError') {
+      throw new Error('タイムアウト');
+    }
+    throw e;
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 async function fetchPrice() {
@@ -278,12 +297,18 @@ async function fetchPrice() {
     const now = new Date();
     document.getElementById('last-updated').textContent = now.getHours() + ':' + String(now.getMinutes()).padStart(2, '0') + ':' + String(now.getSeconds()).padStart(2, '0') + ' 更新';
 
-    document.getElementById('error-banner').style.display = 'none';
+    const banner = document.getElementById('error-banner');
+banner.style.display = 'none';
+banner.textContent =
+'⚠️ データ取得に失敗しました。インターネット接続を確認して「更新」を押してください。';
     checkAlerts(btc.jpy);
   } catch (e) {
-    console.error('fetchPrice error:', e);
-    document.getElementById('error-banner').style.display = 'block';
-  }
+  console.error('fetchPrice error:', e);
+
+  const banner = document.getElementById('error-banner');
+  banner.style.display = 'block';
+  banner.textContent = `⚠️ ${e.message}`;
+}
 }
 
 async function fetchHistory() {
@@ -296,7 +321,7 @@ async function fetchHistory() {
 
     const stepMap = { '1m': 2, '5m': 10, '1h': 20, '1d': 24 };
     const step = stepMap[currentTF];
-    const sampled = prices.filter((_, i) => i % step === 0).slice(-50);
+    const sampled = prices.filter((_, i) => i % step === 0).slice(-100);
 
     priceHistory = sampled.map(p => p[1]);
     const labels = sampled.map(p => {
@@ -309,9 +334,12 @@ async function fetchHistory() {
     renderMacdChart();
     updateIndicators();
   } catch (e) {
-    console.error('fetchHistory error:', e);
-    document.getElementById('error-banner').style.display = 'block';
-  }
+  console.error('fetchHistory error:', e);
+
+  const banner = document.getElementById('error-banner');
+  banner.style.display = 'block';
+  banner.textContent = `⚠️ ${e.message}`;
+}
 }
 
 function calcMA(arr, n) {
@@ -556,8 +584,10 @@ function showToast(msg) {
 }
 
 async function refreshAll() {
-  await fetchHistory();
-  await fetchPrice();
+  await Promise.all([
+    fetchHistory(),
+    fetchPrice()
+  ]);
 }
 
 function startAutoRefresh() {
