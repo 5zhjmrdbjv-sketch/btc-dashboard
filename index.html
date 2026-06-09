@@ -118,6 +118,21 @@
   .safety-reason { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 12px; color: var(--text2); border-top: 0.5px solid var(--border); padding-top: 7px; }
   .safety-reason strong { color: var(--text); font-weight: 600; }
   .risk-note { margin-top: 10px; color: var(--text3); font-size: 11px; line-height: 1.5; }
+  .summary-panel { display: grid; gap: 10px; font-size: 13px; line-height: 1.55; color: var(--text); }
+  .summary-verdict { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding-bottom: 8px; border-bottom: 0.5px solid var(--border); }
+  .summary-verdict span, .summary-detail span { color: var(--text3); font-size: 10px; text-transform: uppercase; letter-spacing: 0.04em; }
+  .summary-verdict strong { font-size: 18px; color: var(--text); }
+  .summary-buy .summary-verdict strong { color: var(--green); }
+  .summary-sell .summary-verdict strong, .summary-risk .summary-verdict strong { color: var(--red); }
+  .summary-copy { color: var(--text); }
+  .summary-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .summary-item { background: var(--bg2); border-radius: var(--radius); padding: 8px 10px; min-width: 0; }
+  .summary-item span { display: block; color: var(--text3); font-size: 10px; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 3px; }
+  .summary-item strong { display: block; color: var(--text); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .summary-detail { display: grid; gap: 4px; background: var(--bg2); border-radius: var(--radius); padding: 9px 10px; }
+  .summary-detail strong { font-size: 13px; color: var(--text); font-weight: 600; }
+  .summary-flags { display: flex; flex-wrap: wrap; gap: 6px; }
+  .summary-flags span { font-size: 11px; color: var(--text2); background: var(--bg2); border-radius: 99px; padding: 3px 8px; }
   .candle-card { padding-bottom: 12px; }
   .candle-summary { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; margin: -2px 0 10px; }
   .candle-stat { min-width: 88px; flex: 1; background: var(--bg2); border-radius: var(--radius); padding: 8px 10px; }
@@ -133,6 +148,7 @@
     .tf-btn { width: 100%; min-height: 32px; }
     .risk-controls { grid-template-columns: 1fr; }
     .safety-grid { grid-template-columns: repeat(2, 1fr); }
+    .summary-grid { grid-template-columns: 1fr; }
     .alert-form { display: grid; grid-template-columns: 1fr; }
     .alert-form select, .alert-form input[type=number], .alert-form button { width: 100%; }
     .candle-canvas-wrap { height: 220px; }
@@ -353,7 +369,7 @@
 <div class="card">
   <div class="card-header" style="margin-bottom:10px;">    <span class="card-title">総括コメント</span>
   </div>
-  <div id="summary-comment" style="font-size:13px; line-height:1.6; color:var(--text);">分析中...</div>
+  <div id="summary-comment" class="summary-panel">分析中...</div>
 </div>
 
 <div class="card">
@@ -884,39 +900,91 @@ function updateIndicators() {
   document.getElementById('bb-dev').textContent = bbDev.toFixed(2) + '%';
 
   const advancedSig = document.getElementById('advanced-signal');
-  let summaryText = '方向感は混在しています。短期の価格変動を確認しながら、慎重に判断してください。';
-  let summaryClass = 'signal signal-neutral';
+  const summaryEl = document.getElementById('summary-comment');
+  const trendScore = [
+    macdStrength > 0 ? 1 : -1,
+    ma5 && ma25 ? (ma5 > ma25 ? 1 : -1) : 0,
+    mom > 0.5 ? 1 : mom < -0.5 ? -1 : 0,
+    bbDev > 0.2 ? 1 : bbDev < -0.2 ? -1 : 0
+  ].reduce((sum, value) => sum + value, 0);
+  const dataIsFallback = usingFallbackPrice || usingFallbackHistory;
+  const trendLabel = trendScore >= 3 ? '上昇優勢' : trendScore <= -3 ? '下落優勢' : trendScore > 0 ? 'やや上向き' : trendScore < 0 ? 'やや下向き' : '中立';
+  const rsiLabel = rsi >= 70 ? '過熱' : rsi <= 30 ? '売られ過ぎ' : rsi >= 60 ? '高め' : rsi <= 40 ? '低め' : '中立';
+  const volLabel = vol > 1.2 ? '高い' : vol > 0.7 ? 'やや高い' : '通常';
+  const nearResistance = resistanceGap < vol;
+  const nearSupport = supportGap < vol;
 
-  if (macdStrength > 0 && rsi > 55 && bbDev > 0.2) {
-    advancedSig.className = 'signal signal-buy';
-    advancedSig.textContent = '強気優勢・上方ブレイクの兆候';
-    summaryText = '強気優勢です。MACDの上昇、RSIの上振れ、BB上方乖離が揃っており、上昇トレンドが続く可能性が高いです。';
-    summaryClass = 'signal signal-buy';
-  } else if (macdStrength < 0 && rsi < 45 && bbDev < -0.2) {
-    advancedSig.className = 'signal signal-sell';
-    advancedSig.textContent = '弱気優勢・下方ブレイクの兆候';
-    summaryText = '弱気優勢です。MACDの低下、RSIの下振れ、BB下方乖離が揃っており、下落リスクに注意が必要です。';
-    summaryClass = 'signal signal-sell';
-  } else if (rsi > 60) {
-    advancedSig.className = 'signal signal-neutral';
-    advancedSig.textContent = '買われ過ぎ気味';
-    summaryText = '買われ過ぎ気味です。短期的には上値が重くなる可能性があるため、反発や調整の確認を優先してください。';
-    summaryClass = 'signal signal-neutral';
-  } else if (rsi < 40) {
-    advancedSig.className = 'signal signal-neutral';
-    advancedSig.textContent = '売られ過ぎ気味';
-    summaryText = '売られ過ぎ気味です。押し目の可能性があり、反発の兆候を見極めるのが重要です。';
-    summaryClass = 'signal signal-neutral';
-  } else {
-    advancedSig.className = 'signal signal-neutral';
-    advancedSig.textContent = '方向感は混在';
-    summaryText = '方向感は混在しています。短期の価格変動を確認しながら、慎重に判断してください。';
-    summaryClass = 'signal signal-neutral';
+  let verdict = '方向感なし・見送り寄り';
+  let verdictText = '上昇と下落の材料が混ざっています。無理に入らず、方向がそろうまで待つ場面です。';
+  let nextCheck = 'MA5/MA25、RSI 45-60、出来高拡大が同じ方向へそろうか確認。';
+  let summaryClass = 'summary-neutral';
+
+  if (dataIsFallback) {
+    verdict = '見送り優先';
+    verdictText = '参考値が混ざっています。実トレード判断には使わず、API復旧後のリアルタイム表示を待つ状態です。';
+    nextCheck = '価格と履歴の両方がリアルタイム表示へ戻ってから再判定。';
+    summaryClass = 'summary-risk';
+  } else if (rsi >= 72) {
+    verdict = '過熱・新規買いは待ち';
+    verdictText = 'RSIが高く、短期の上値追いは不利になりやすい状態です。押し目か横ばい調整を待つ方が安全です。';
+    nextCheck = 'RSIが65以下へ落ち着くか、直近高値を終値で明確に抜けるか確認。';
+    summaryClass = 'summary-risk';
+  } else if (rsi <= 28) {
+    verdict = '売られ過ぎ・反発確認待ち';
+    verdictText = '下げが強く、反発余地はありますが、落ちる勢いも残っています。反転サインなしの買いは危険です。';
+    nextCheck = 'RSI 35回復、陽線連続、MA5上抜けのどれかを確認。';
+    summaryClass = 'summary-neutral';
+  } else if (vol > 1.2) {
+    verdict = 'ボラ高め・サイズ縮小';
+    verdictText = '値幅が大きく、損切り幅も広がりやすい状態です。入るなら数量を小さくし、損失上限を優先してください。';
+    nextCheck = 'ATR低下、ローソク足の値幅縮小、サポレジ付近での反応を確認。';
+    summaryClass = 'summary-risk';
+  } else if (trendScore >= 3 && !nearResistance && rsi < 68) {
+    verdict = 'ロング目線・小さく検討';
+    verdictText = 'MACD、移動平均、モメンタムが上向きで、過熱しすぎていません。ただし損切り前提で小さく見る場面です。';
+    nextCheck = '押し目でMA5を維持するか、直近高値を終値で抜けるか確認。';
+    summaryClass = 'summary-buy';
+  } else if (trendScore <= -3 && !nearSupport && rsi > 32) {
+    verdict = '下落警戒・買い急がない';
+    verdictText = 'MACD、移動平均、モメンタムが下向きで、反発根拠がまだ弱い状態です。買いは待つ判断が無難です。';
+    nextCheck = 'サポート反発、RSI 40回復、MA5上抜けを確認。';
+    summaryClass = 'summary-sell';
+  } else if (trendScore > 0) {
+    verdict = '上向きだが条件待ち';
+    verdictText = nearResistance ? '上向き材料はありますが、レジスタンスが近く、利幅より反落リスクが目立ちます。' : '上向き材料はありますが、まだ全指標がそろっていません。追いかけず確認待ちです。';
+    nextCheck = nearResistance ? 'レジスタンス突破後の定着、または押し目形成を確認。' : 'RSI過熱なし、出来高拡大、MA5維持を確認。';
+    summaryClass = 'summary-neutral';
+  } else if (trendScore < 0) {
+    verdict = '下向きだが条件待ち';
+    verdictText = nearSupport ? '下向き材料はありますが、サポートが近く、反発が出やすい位置です。' : '下向き材料があります。買いは反転確認を待ち、焦って拾わない方が安全です。';
+    nextCheck = nearSupport ? 'サポート割れ継続か、反発してMA5を回復するか確認。' : 'RSI回復、MACD改善、陽線連続を確認。';
+    summaryClass = 'summary-neutral';
   }
 
-  const summaryEl = document.getElementById('summary-comment');
-  summaryEl.textContent = summaryText;
-  summaryEl.style.color = summaryClass.includes('signal-buy') ? 'var(--green)' : summaryClass.includes('signal-sell') ? 'var(--red)' : 'var(--text)';
+  const advancedClass = summaryClass === 'summary-buy' ? 'signal signal-buy' : summaryClass === 'summary-sell' ? 'signal signal-sell' : summaryClass === 'summary-risk' ? 'signal signal-risk' : 'signal signal-neutral';
+  advancedSig.className = advancedClass;
+  advancedSig.textContent = verdict;
+
+  const flags = [];
+  if (dataIsFallback) flags.push('参考値あり');
+  if (nearResistance) flags.push('レジスタンス近い');
+  if (nearSupport) flags.push('サポート近い');
+  if (volChange > 10) flags.push('出来高拡大');
+  if (volChange < -10) flags.push('出来高縮小');
+  if (!flags.length) flags.push('大きな警戒フラグなし');
+
+  summaryEl.className = 'summary-panel ' + summaryClass;
+  summaryEl.innerHTML = `
+    <div class="summary-verdict"><span>結論</span><strong>${verdict}</strong></div>
+    <div class="summary-copy">${verdictText}</div>
+    <div class="summary-grid">
+      <div class="summary-item"><span>トレンド</span><strong>${trendLabel}</strong></div>
+      <div class="summary-item"><span>RSI</span><strong>${rsi.toFixed(1)} / ${rsiLabel}</strong></div>
+      <div class="summary-item"><span>ボラ</span><strong>${vol.toFixed(2)}% / ${volLabel}</strong></div>
+    </div>
+    <div class="summary-detail"><span>次に見る条件</span><strong>${nextCheck}</strong></div>
+    <div class="summary-flags">${flags.map(flag => `<span>${flag}</span>`).join('')}</div>
+  `;
   updateSafetyPanel();
 }
 
