@@ -1,290 +1,391 @@
-
-<h2 class="sr-only">ビットコイン リアルタイムダッシュボード — 価格チャート・テクニカル指標・アラート機能</h2>
-
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BTC/JPY ダッシュボード</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <style>
-* { box-sizing: border-box; margin: 0; padding: 0; }
-body { font-family: var(--font-sans); }
-.header { display: flex; align-items: center; justify-content: space-between; padding: 1rem 0 0.75rem; border-bottom: 0.5px solid var(--color-border-tertiary); margin-bottom: 1rem; }
-.header-left { display: flex; align-items: center; gap: 10px; }
-.btc-badge { width: 32px; height: 32px; border-radius: 50%; background: #f7931a; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 500; color: #fff; }
-.ticker { font-size: 20px; font-weight: 500; color: var(--color-text-primary); }
-.subtitle { font-size: 12px; color: var(--color-text-secondary); margin-top: 2px; }
-.live-badge { display: flex; align-items: center; gap: 5px; font-size: 11px; color: var(--color-text-success); padding: 3px 8px; border: 0.5px solid var(--color-border-success); border-radius: 99px; }
-.live-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--color-text-success); animation: pulse 1.5s infinite; }
-@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
-.metrics { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 1rem; }
-.metric { background: var(--color-background-secondary); border-radius: var(--border-radius-md); padding: 12px 14px; }
-.metric-label { font-size: 11px; color: var(--color-text-secondary); margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.04em; }
-.metric-value { font-size: 18px; font-weight: 500; color: var(--color-text-primary); }
-.metric-sub { font-size: 12px; margin-top: 2px; }
-.up { color: var(--color-text-success); }
-.down { color: var(--color-text-danger); }
-.chart-card { background: var(--color-background-primary); border: 0.5px solid var(--color-border-tertiary); border-radius: var(--border-radius-lg); padding: 1rem 1.25rem; margin-bottom: 1rem; }
-.chart-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
-.chart-title { font-size: 13px; font-weight: 500; color: var(--color-text-secondary); }
-.tf-btns { display: flex; gap: 4px; }
-.tf-btn { font-size: 11px; padding: 3px 8px; border-radius: 6px; border: 0.5px solid var(--color-border-secondary); background: transparent; cursor: pointer; color: var(--color-text-secondary); transition: all 0.15s; }
-.tf-btn.active { background: var(--color-background-info); color: var(--color-text-info); border-color: var(--color-border-info); }
-.indicators { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 1rem; }
-.ind-card { background: var(--color-background-primary); border: 0.5px solid var(--color-border-tertiary); border-radius: var(--border-radius-lg); padding: 1rem 1.25rem; }
-.ind-title { font-size: 12px; color: var(--color-text-secondary); margin-bottom: 8px; font-weight: 500; }
-.ind-value { font-size: 22px; font-weight: 500; color: var(--color-text-primary); margin-bottom: 4px; }
-.ind-signal { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; padding: 2px 8px; border-radius: 99px; }
-.signal-buy { background: var(--color-background-success); color: var(--color-text-success); }
-.signal-sell { background: var(--color-background-danger); color: var(--color-text-danger); }
-.signal-neutral { background: var(--color-background-secondary); color: var(--color-text-secondary); }
-.alert-card { background: var(--color-background-primary); border: 0.5px solid var(--color-border-tertiary); border-radius: var(--border-radius-lg); padding: 1rem 1.25rem; }
-.alert-title { font-size: 13px; font-weight: 500; color: var(--color-text-secondary); margin-bottom: 12px; display: flex; align-items: center; gap: 6px; }
-.alert-form { display: flex; gap: 8px; margin-bottom: 12px; }
-.alert-form input { flex: 1; font-size: 13px; }
-.alert-form select { font-size: 13px; width: 90px; }
-.alert-list { display: flex; flex-direction: column; gap: 6px; }
-.alert-item { display: flex; align-items: center; justify-content: space-between; background: var(--color-background-secondary); border-radius: var(--border-radius-md); padding: 8px 12px; font-size: 13px; }
-.alert-left { display: flex; align-items: center; gap: 8px; }
-.alert-dir { font-size: 11px; padding: 2px 6px; border-radius: 4px; }
-.alert-dir.above { background: var(--color-background-success); color: var(--color-text-success); }
-.alert-dir.below { background: var(--color-background-danger); color: var(--color-text-danger); }
-.alert-price { font-weight: 500; color: var(--color-text-primary); }
-.alert-del { background: transparent; border: none; cursor: pointer; color: var(--color-text-tertiary); font-size: 16px; padding: 0 2px; }
-.alert-del:hover { color: var(--color-text-danger); }
-.add-alert-btn { font-size: 13px; }
-.rsi-bar { width: 100%; height: 8px; background: var(--color-background-secondary); border-radius: 99px; margin: 8px 0; overflow: hidden; }
-.rsi-fill { height: 100%; border-radius: 99px; transition: width 0.5s; }
-.macd-chart { position: relative; height: 60px; width: 100%; }
-.progress-row { display: flex; justify-content: space-between; font-size: 10px; color: var(--color-text-tertiary); }
-.footer-note { font-size: 11px; color: var(--color-text-tertiary); text-align: center; padding: 0.5rem 0; }
-#toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: var(--color-background-primary); border: 0.5px solid var(--color-border-tertiary); border-radius: var(--border-radius-md); padding: 10px 18px; font-size: 13px; font-weight: 500; display: none; z-index: 999; box-shadow: none; color: var(--color-text-primary); }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #ffffff;
+    --bg2: #f5f5f5;
+    --bg3: #ececec;
+    --text: #111111;
+    --text2: #555555;
+    --text3: #999999;
+    --border: rgba(0,0,0,0.1);
+    --border2: rgba(0,0,0,0.18);
+    --green: #1d9e75;
+    --red: #e24b4a;
+    --blue: #378add;
+    --green-bg: #eaf3de;
+    --red-bg: #fcebeb;
+    --blue-bg: #e6f1fb;
+    --radius: 8px;
+    --radius-lg: 12px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1a1a1a;
+      --bg2: #242424;
+      --bg3: #2e2e2e;
+      --text: #f0f0f0;
+      --text2: #aaaaaa;
+      --text3: #666666;
+      --border: rgba(255,255,255,0.1);
+      --border2: rgba(255,255,255,0.18);
+      --green-bg: #0a2e1e;
+      --red-bg: #2e0a0a;
+      --blue-bg: #0a1e2e;
+    }
+  }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif; background: var(--bg); color: var(--text); padding: 16px; max-width: 780px; margin: 0 auto; }
+  .header { display: flex; align-items: center; justify-content: space-between; padding-bottom: 14px; border-bottom: 0.5px solid var(--border); margin-bottom: 16px; }
+  .header-left { display: flex; align-items: center; gap: 10px; }
+  .btc-badge { width: 36px; height: 36px; border-radius: 50%; background: #f7931a; display: flex; align-items: center; justify-content: center; font-size: 16px; font-weight: 700; color: #fff; flex-shrink: 0; }
+  .ticker { font-size: 20px; font-weight: 600; color: var(--text); }
+  .subtitle { font-size: 12px; color: var(--text2); margin-top: 1px; }
+  .header-right { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+  .live-badge { display: flex; align-items: center; gap: 5px; font-size: 11px; color: var(--green); padding: 3px 10px; border: 0.5px solid var(--green); border-radius: 99px; }
+  .live-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--green); animation: pulse 1.5s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.35} }
+  .btn { font-size: 12px; padding: 5px 12px; border-radius: var(--radius); border: 0.5px solid var(--border2); background: var(--bg); color: var(--text2); cursor: pointer; transition: background 0.15s; }
+  .btn:hover { background: var(--bg2); }
+  .btn:active { transform: scale(0.97); }
+  .metrics { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 14px; }
+  @media (max-width: 480px) { .metrics { grid-template-columns: repeat(2, 1fr); } }
+  .metric { background: var(--bg2); border-radius: var(--radius); padding: 12px 14px; }
+  .metric-label { font-size: 10px; color: var(--text3); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 5px; }
+  .metric-value { font-size: 17px; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .metric-sub { font-size: 12px; margin-top: 3px; color: var(--text3); }
+  .up { color: var(--green); }
+  .down { color: var(--red); }
+  .card { background: var(--bg); border: 0.5px solid var(--border); border-radius: var(--radius-lg); padding: 14px 16px; margin-bottom: 12px; }
+  .card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+  .card-title { font-size: 13px; font-weight: 500; color: var(--text2); }
+  .tf-btns { display: flex; gap: 4px; }
+  .tf-btn { font-size: 11px; padding: 3px 9px; border-radius: 6px; border: 0.5px solid var(--border2); background: transparent; cursor: pointer; color: var(--text2); transition: all 0.15s; }
+  .tf-btn.active { background: var(--blue-bg); color: var(--blue); border-color: var(--blue); }
+  .indicators { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
+  @media (max-width: 480px) { .indicators { grid-template-columns: 1fr; } }
+  .ind-label { font-size: 11px; color: var(--text2); font-weight: 500; margin-bottom: 8px; }
+  .ind-value { font-size: 22px; font-weight: 600; color: var(--text); margin-bottom: 6px; }
+  .rsi-bar { width: 100%; height: 7px; background: var(--bg3); border-radius: 99px; margin: 8px 0 4px; overflow: hidden; }
+  .rsi-fill { height: 100%; border-radius: 99px; transition: width 0.6s, background 0.4s; }
+  .rsi-labels { display: flex; justify-content: space-between; font-size: 10px; color: var(--text3); }
+  .signal { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; padding: 2px 9px; border-radius: 99px; margin-top: 8px; }
+  .signal-buy { background: var(--green-bg); color: var(--green); }
+  .signal-sell { background: var(--red-bg); color: var(--red); }
+  .signal-neutral { background: var(--bg2); color: var(--text2); }
+  .ma-row { display: flex; justify-content: space-between; font-size: 13px; padding: 4px 0; border-bottom: 0.5px solid var(--border); }
+  .ma-row:last-child { border-bottom: none; }
+  .ma-key { color: var(--text2); }
+  .ma-val { font-weight: 500; color: var(--text); }
+  .alert-form { display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
+  .alert-form select, .alert-form input[type=number] { font-size: 13px; padding: 6px 10px; border-radius: var(--radius); border: 0.5px solid var(--border2); background: var(--bg2); color: var(--text); outline: none; }
+  .alert-form select { min-width: 130px; }
+  .alert-form input[type=number] { flex: 1; min-width: 140px; }
+  .alert-form input[type=number]::placeholder { color: var(--text3); }
+  .alert-list { display: flex; flex-direction: column; gap: 6px; }
+  .alert-item { display: flex; align-items: center; justify-content: space-between; background: var(--bg2); border-radius: var(--radius); padding: 8px 12px; font-size: 13px; }
+  .alert-left { display: flex; align-items: center; gap: 8px; }
+  .alert-dir { font-size: 11px; padding: 2px 7px; border-radius: 4px; }
+  .alert-dir.above { background: var(--green-bg); color: var(--green); }
+  .alert-dir.below { background: var(--red-bg); color: var(--red); }
+  .alert-triggered { opacity: 0.5; }
+  .alert-del { background: transparent; border: none; cursor: pointer; color: var(--text3); font-size: 18px; line-height: 1; padding: 0 2px; }
+  .alert-del:hover { color: var(--red); }
+  .empty-hint { font-size: 13px; color: var(--text3); text-align: center; padding: 10px; }
+  .toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: var(--text); color: var(--bg); border-radius: var(--radius); padding: 10px 20px; font-size: 13px; font-weight: 500; display: none; z-index: 9999; white-space: nowrap; max-width: 90vw; overflow: hidden; text-overflow: ellipsis; }
+  .footer { font-size: 11px; color: var(--text3); text-align: center; padding: 8px 0 4px; }
+  .error-banner { background: var(--red-bg); color: var(--red); border-radius: var(--radius); padding: 10px 14px; font-size: 13px; margin-bottom: 12px; display: none; }
+  .last-updated { font-size: 11px; color: var(--text3); }
 </style>
+</head>
+<body>
 
 <div class="header">
   <div class="header-left">
     <div class="btc-badge">₿</div>
     <div>
       <div class="ticker">BTC / JPY</div>
-      <div class="subtitle">ビットコイン リアルタイムダッシュボード</div>
+      <div class="subtitle">リアルタイムダッシュボード</div>
     </div>
   </div>
-  <div style="display:flex;align-items:center;gap:10px;">
-    <div class="live-badge"><div class="live-dot"></div>ライブ更新中</div>
-    <button onclick="refreshData()" style="font-size:12px;" title="更新"><i class="ti ti-refresh" aria-hidden="true"></i> 更新</button>
+  <div class="header-right">
+    <span class="last-updated" id="last-updated">--</span>
+    <div class="live-badge"><div class="live-dot"></div>ライブ</div>
+    <button class="btn" onclick="refreshAll()">↻ 更新</button>
   </div>
+</div>
+
+<div class="error-banner" id="error-banner">
+  ⚠️ データ取得に失敗しました。インターネット接続を確認して「更新」を押してください。
 </div>
 
 <div class="metrics">
   <div class="metric">
     <div class="metric-label">現在価格</div>
-    <div class="metric-value" id="price">読込中...</div>
+    <div class="metric-value" id="price">--</div>
     <div class="metric-sub" id="change">--</div>
   </div>
   <div class="metric">
     <div class="metric-label">24h 最高値</div>
     <div class="metric-value" id="high">--</div>
-    <div class="metric-sub" style="color:var(--color-text-tertiary);font-size:12px;">直近24時間</div>
+    <div class="metric-sub" style="color:var(--text3)">直近24時間</div>
   </div>
   <div class="metric">
     <div class="metric-label">24h 最安値</div>
     <div class="metric-value" id="low">--</div>
-    <div class="metric-sub" style="color:var(--color-text-tertiary);font-size:12px;">直近24時間</div>
+    <div class="metric-sub" style="color:var(--text3)">直近24時間</div>
   </div>
   <div class="metric">
     <div class="metric-label">出来高 (BTC)</div>
     <div class="metric-value" id="volume">--</div>
-    <div class="metric-sub" style="color:var(--color-text-tertiary);font-size:12px;">24時間</div>
+    <div class="metric-sub" style="color:var(--text3)">24時間</div>
   </div>
 </div>
 
-<div class="chart-card">
-  <div class="chart-header">
-    <div class="chart-title">価格チャート (JPY)</div>
+<div class="card">
+  <div class="card-header">
+    <span class="card-title">価格チャート (JPY) — MA5 点線</span>
     <div class="tf-btns">
-      <button class="tf-btn" onclick="setTF('1m')">1分</button>
-      <button class="tf-btn active" onclick="setTF('5m')">5分</button>
-      <button class="tf-btn" onclick="setTF('1h')">1時間</button>
-      <button class="tf-btn" onclick="setTF('1d')">日足</button>
+      <button class="tf-btn" onclick="setTF('1m')" id="tf-1m">1分</button>
+      <button class="tf-btn active" onclick="setTF('5m')" id="tf-5m">5分</button>
+      <button class="tf-btn" onclick="setTF('1h')" id="tf-1h">1時間</button>
+      <button class="tf-btn" onclick="setTF('1d')" id="tf-1d">日足</button>
     </div>
   </div>
-  <div style="position:relative;height:220px;">
-    <canvas id="priceChart" role="img" aria-label="BTC/JPY価格チャート">BTC/JPYの価格推移を示すラインチャート</canvas>
+  <div style="position:relative;height:200px;">
+    <canvas id="priceChart" role="img" aria-label="BTC/JPY価格チャート"></canvas>
   </div>
 </div>
 
 <div class="indicators">
-  <div class="ind-card">
-    <div class="ind-title"><i class="ti ti-chart-line" style="font-size:14px;" aria-hidden="true"></i> RSI (14)</div>
+  <div class="card" style="margin-bottom:0;">
+    <div class="ind-label">RSI (14)</div>
     <div class="ind-value" id="rsi-val">--</div>
-    <div class="rsi-bar"><div class="rsi-fill" id="rsi-fill" style="width:50%;background:#378add;"></div></div>
-    <div class="progress-row"><span>売られ過ぎ 30</span><span>買われ過ぎ 70</span></div>
-    <div style="margin-top:8px;"><span class="ind-signal signal-neutral" id="rsi-signal">計算中...</span></div>
+    <div class="rsi-bar"><div class="rsi-fill" id="rsi-fill" style="width:50%;background:var(--blue);"></div></div>
+    <div class="rsi-labels"><span>売られ過ぎ 30</span><span>買われ過ぎ 70</span></div>
+    <span class="signal signal-neutral" id="rsi-signal">計算中...</span>
   </div>
-  <div class="ind-card">
-    <div class="ind-title"><i class="ti ti-trending-up" style="font-size:14px;" aria-hidden="true"></i> MACD</div>
+  <div class="card" style="margin-bottom:0;">
+    <div class="ind-label">MACD (12/26)</div>
     <div class="ind-value" id="macd-val">--</div>
-    <div class="macd-chart">
-      <canvas id="macdChart" role="img" aria-label="MACDヒストグラム">MACDヒストグラム</canvas>
+    <div style="position:relative;height:56px;margin-top:4px;">
+      <canvas id="macdChart" role="img" aria-label="MACDヒストグラム"></canvas>
     </div>
-    <div style="margin-top:4px;"><span class="ind-signal signal-neutral" id="macd-signal">計算中...</span></div>
+    <span class="signal signal-neutral" id="macd-signal">計算中...</span>
   </div>
-  <div class="ind-card">
-    <div class="ind-title"><i class="ti ti-chart-dots" style="font-size:14px;" aria-hidden="true"></i> ボリンジャーバンド</div>
-    <div style="display:flex;flex-direction:column;gap:6px;margin-top:4px;">
-      <div style="display:flex;justify-content:space-between;font-size:13px;"><span style="color:var(--color-text-secondary)">上限</span><span id="bb-upper" style="font-weight:500;color:var(--color-text-primary)">--</span></div>
-      <div style="display:flex;justify-content:space-between;font-size:13px;"><span style="color:var(--color-text-secondary)">中央 (20MA)</span><span id="bb-mid" style="font-weight:500;color:var(--color-text-primary)">--</span></div>
-      <div style="display:flex;justify-content:space-between;font-size:13px;"><span style="color:var(--color-text-secondary)">下限</span><span id="bb-lower" style="font-weight:500;color:var(--color-text-primary)">--</span></div>
+  <div class="card" style="margin-bottom:0;">
+    <div class="ind-label">ボリンジャーバンド (20)</div>
+    <div style="margin-top:4px;">
+      <div class="ma-row"><span class="ma-key">上限 (+2σ)</span><span class="ma-val" id="bb-upper">--</span></div>
+      <div class="ma-row"><span class="ma-key">中央 (20MA)</span><span class="ma-val" id="bb-mid">--</span></div>
+      <div class="ma-row"><span class="ma-key">下限 (−2σ)</span><span class="ma-val" id="bb-lower">--</span></div>
     </div>
-    <div style="margin-top:10px;"><span class="ind-signal signal-neutral" id="bb-signal">計算中...</span></div>
+    <span class="signal signal-neutral" id="bb-signal">計算中...</span>
   </div>
-  <div class="ind-card">
-    <div class="ind-title"><i class="ti ti-arrows-horizontal" style="font-size:14px;" aria-hidden="true"></i> 移動平均線</div>
-    <div style="display:flex;flex-direction:column;gap:6px;margin-top:4px;">
-      <div style="display:flex;justify-content:space-between;font-size:13px;"><span style="color:var(--color-text-secondary)">MA 5</span><span id="ma5" style="font-weight:500;color:var(--color-text-primary)">--</span></div>
-      <div style="display:flex;justify-content:space-between;font-size:13px;"><span style="color:var(--color-text-secondary)">MA 25</span><span id="ma25" style="font-weight:500;color:var(--color-text-primary)">--</span></div>
-      <div style="display:flex;justify-content:space-between;font-size:13px;"><span style="color:var(--color-text-secondary)">MA 75</span><span id="ma75" style="font-weight:500;color:var(--color-text-primary)">--</span></div>
+  <div class="card" style="margin-bottom:0;">
+    <div class="ind-label">移動平均線</div>
+    <div style="margin-top:4px;">
+      <div class="ma-row"><span class="ma-key">MA 5</span><span class="ma-val" id="ma5">--</span></div>
+      <div class="ma-row"><span class="ma-key">MA 25</span><span class="ma-val" id="ma25">--</span></div>
+      <div class="ma-row"><span class="ma-key">MA 75</span><span class="ma-val" id="ma75">--</span></div>
     </div>
-    <div style="margin-top:10px;"><span class="ind-signal signal-neutral" id="ma-signal">計算中...</span></div>
+    <span class="signal signal-neutral" id="ma-signal">計算中...</span>
   </div>
 </div>
 
-<div class="alert-card">
-  <div class="alert-title"><i class="ti ti-bell" style="font-size:14px;" aria-hidden="true"></i> 価格アラート設定</div>
+<div class="card">
+  <div class="card-header" style="margin-bottom:10px;">
+    <span class="card-title">🔔 価格アラート</span>
+  </div>
   <div class="alert-form">
     <select id="alert-dir">
       <option value="above">↑ 上回ったら</option>
       <option value="below">↓ 下回ったら</option>
     </select>
-    <input type="number" id="alert-price" placeholder="価格 (JPY)" step="100000" />
-    <button class="add-alert-btn" onclick="addAlert()"><i class="ti ti-plus" style="font-size:14px;vertical-align:-2px;" aria-hidden="true"></i> 追加</button>
+    <input type="number" id="alert-price" placeholder="価格 (例: 15000000)" step="10000" min="0" />
+    <button class="btn" onclick="addAlert()" style="white-space:nowrap;">＋ 追加</button>
   </div>
-  <div class="alert-list" id="alert-list"></div>
+  <div class="alert-list" id="alert-list">
+    <div class="empty-hint">アラートはまだ設定されていません</div>
+  </div>
 </div>
 
-<div class="footer-note">※ データはCoinGecko APIより取得。価格は参考情報であり、投資アドバイスではありません。</div>
-<div id="toast"></div>
+<div class="footer">※ CoinGecko API より取得。30秒ごと自動更新。投資アドバイスではありません。</div>
+<div class="toast" id="toast"></div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script>
-let priceChart, macdChart;
-let priceHistory = [];
-let alerts = [];
-let currentPrice = 0;
-let currentTF = '5m';
-let refreshInterval;
+const PROXY_URLS = [
+  'https://api.coingecko.com/api/v3',
+  'https://api.coingecko.com/api/v3'
+];
 
-function fmt(n) { return n ? Math.round(n).toLocaleString('ja-JP') + '円' : '--'; }
+let priceHistory = [];
+let currentTF = '5m';
+let currentPrice = 0;
+let alerts = JSON.parse(localStorage.getItem('btc_alerts') || '[]');
+let priceChart = null;
+let macdChart = null;
+let refreshTimer = null;
+
+function fmt(n) {
+  if (!n && n !== 0) return '--';
+  return '¥' + Math.round(n).toLocaleString('ja-JP');
+}
+
+function fmtSmall(n) {
+  if (!n && n !== 0) return '--';
+  const abs = Math.abs(n);
+  if (abs >= 1000000) return (n / 1000000).toFixed(2) + 'M';
+  if (abs >= 1000) return (n / 1000).toFixed(1) + 'K';
+  return Math.round(n).toLocaleString('ja-JP');
+}
+
+async function fetchWithFallback(path) {
+  const url = PROXY_URLS[0] + path;
+  const res = await fetch(url, {
+    headers: { 'Accept': 'application/json' },
+    cache: 'no-store'
+  });
+  if (!res.ok) throw new Error('HTTP ' + res.status);
+  return res.json();
+}
 
 async function fetchPrice() {
   try {
-    const r = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=jpy&include_24hr_change=true&include_24hr_vol=true&include_24hr_high=true&include_24hr_low=true');
-    const d = await r.json();
-    const btc = d.bitcoin;
-    currentPrice = btc.jpy;
-    const chg = btc.jpy_24h_change;
+    const data = await fetchWithFallback('/simple/price?ids=bitcoin&vs_currencies=jpy&include_24hr_change=true&include_24hr_vol=true&include_24hr_high=true&include_24hr_low=true');
+    const btc = data.bitcoin;
+    if (!btc) throw new Error('no data');
 
+    currentPrice = btc.jpy;
     document.getElementById('price').textContent = fmt(btc.jpy);
+
+    const chg = btc.jpy_24h_change;
     const chgEl = document.getElementById('change');
     chgEl.textContent = (chg >= 0 ? '+' : '') + chg.toFixed(2) + '%  24h';
     chgEl.className = 'metric-sub ' + (chg >= 0 ? 'up' : 'down');
 
     document.getElementById('high').textContent = fmt(btc.jpy_24h_high);
     document.getElementById('low').textContent = fmt(btc.jpy_24h_low);
+
     const vol = btc.jpy_24h_vol;
     document.getElementById('volume').textContent = vol ? (vol / btc.jpy).toFixed(1) : '--';
 
-    priceHistory.push(btc.jpy);
-    if (priceHistory.length > 60) priceHistory.shift();
+    const now = new Date();
+    document.getElementById('last-updated').textContent = now.getHours() + ':' + String(now.getMinutes()).padStart(2, '0') + ':' + String(now.getSeconds()).padStart(2, '0') + ' 更新';
 
+    document.getElementById('error-banner').style.display = 'none';
     checkAlerts(btc.jpy);
-    updateCharts();
-    updateIndicators();
-  } catch(e) {
-    document.getElementById('price').textContent = 'エラー';
+  } catch (e) {
+    console.error('fetchPrice error:', e);
+    document.getElementById('error-banner').style.display = 'block';
   }
 }
 
 async function fetchHistory() {
-  const days = currentTF === '1d' ? 30 : currentTF === '1h' ? 2 : 1;
+  const tfMap = { '1m': 1, '5m': 1, '1h': 2, '1d': 30 };
+  const days = tfMap[currentTF];
   try {
-    const r = await fetch(`https://api.coingecko.com/api/v3/coins/bitcoin/market_chart?vs_currency=jpy&days=${days}`);
-    const d = await r.json();
-    const prices = d.prices;
-    const step = currentTF === '1d' ? 24 : currentTF === '1h' ? 4 : currentTF === '5m' ? 12 : 3;
-    const sampled = prices.filter((_, i) => i % step === 0).slice(-40);
+    const data = await fetchWithFallback(`/coins/bitcoin/market_chart?vs_currency=jpy&days=${days}&precision=0`);
+    const prices = data.prices;
+    if (!prices || !prices.length) throw new Error('no prices');
+
+    const stepMap = { '1m': 2, '5m': 10, '1h': 20, '1d': 24 };
+    const step = stepMap[currentTF];
+    const sampled = prices.filter((_, i) => i % step === 0).slice(-50);
+
     priceHistory = sampled.map(p => p[1]);
     const labels = sampled.map(p => {
       const dt = new Date(p[0]);
-      if (currentTF === '1d') return dt.toLocaleDateString('ja-JP', {month:'short',day:'numeric'});
-      return dt.toLocaleTimeString('ja-JP', {hour:'2-digit',minute:'2-digit'});
+      if (currentTF === '1d') return (dt.getMonth() + 1) + '/' + dt.getDate();
+      return String(dt.getHours()).padStart(2, '0') + ':' + String(dt.getMinutes()).padStart(2, '0');
     });
-    updateCharts(labels);
+
+    renderPriceChart(labels);
+    renderMacdChart();
     updateIndicators();
-  } catch(e) {}
+  } catch (e) {
+    console.error('fetchHistory error:', e);
+    document.getElementById('error-banner').style.display = 'block';
+  }
 }
 
 function calcMA(arr, n) {
   if (arr.length < n) return null;
-  return arr.slice(-n).reduce((a,b)=>a+b,0)/n;
+  return arr.slice(-n).reduce((a, b) => a + b, 0) / n;
 }
 
-function calcRSI(arr, n=14) {
-  if (arr.length < n+1) return 50;
-  const changes = arr.slice(-n-1).map((v,i,a) => i===0?0:v-a[i-1]).slice(1);
-  const gains = changes.map(c=>Math.max(c,0));
-  const losses = changes.map(c=>Math.max(-c,0));
-  const ag = gains.reduce((a,b)=>a+b,0)/n;
-  const al = losses.reduce((a,b)=>a+b,0)/n;
+function calcRSI(arr, n = 14) {
+  if (arr.length < n + 1) return 50;
+  const slice = arr.slice(-(n + 1));
+  const changes = slice.map((v, i, a) => i === 0 ? 0 : v - a[i - 1]).slice(1);
+  const gains = changes.map(c => Math.max(c, 0));
+  const losses = changes.map(c => Math.max(-c, 0));
+  const ag = gains.reduce((a, b) => a + b, 0) / n;
+  const al = losses.reduce((a, b) => a + b, 0) / n;
   if (al === 0) return 100;
-  const rs = ag/al;
-  return 100 - 100/(1+rs);
+  return 100 - 100 / (1 + ag / al);
 }
 
 function calcEMA(arr, n) {
-  if (arr.length < n) return arr[arr.length-1];
-  const k = 2/(n+1);
-  let ema = arr.slice(0,n).reduce((a,b)=>a+b,0)/n;
-  for (let i=n; i<arr.length; i++) ema = arr[i]*k + ema*(1-k);
+  if (!arr.length) return 0;
+  if (arr.length < n) return arr[arr.length - 1];
+  const k = 2 / (n + 1);
+  let ema = arr.slice(0, n).reduce((a, b) => a + b, 0) / n;
+  for (let i = n; i < arr.length; i++) ema = arr[i] * k + ema * (1 - k);
   return ema;
 }
 
-function calcBB(arr, n=20) {
+function calcBB(arr, n = 20) {
   if (arr.length < n) return null;
   const slice = arr.slice(-n);
-  const mid = slice.reduce((a,b)=>a+b,0)/n;
-  const std = Math.sqrt(slice.map(v=>(v-mid)**2).reduce((a,b)=>a+b,0)/n);
-  return { upper: mid+2*std, mid, lower: mid-2*std };
+  const mid = slice.reduce((a, b) => a + b, 0) / n;
+  const variance = slice.map(v => (v - mid) ** 2).reduce((a, b) => a + b, 0) / n;
+  const std = Math.sqrt(variance);
+  return { upper: mid + 2 * std, mid, lower: mid - 2 * std };
 }
 
 function updateIndicators() {
   if (priceHistory.length < 2) return;
 
+  // RSI
   const rsi = calcRSI(priceHistory);
   document.getElementById('rsi-val').textContent = rsi.toFixed(1);
-  const rsiEl = document.getElementById('rsi-fill');
-  rsiEl.style.width = rsi + '%';
-  rsiEl.style.background = rsi > 70 ? '#e24b4a' : rsi < 30 ? '#1d9e75' : '#378add';
+  const rsiBar = document.getElementById('rsi-fill');
+  rsiBar.style.width = Math.min(100, rsi) + '%';
+  rsiBar.style.background = rsi > 70 ? 'var(--red)' : rsi < 30 ? 'var(--green)' : 'var(--blue)';
   const rsiSig = document.getElementById('rsi-signal');
-  if (rsi > 70) { rsiSig.className='ind-signal signal-sell'; rsiSig.textContent='売られ過ぎ (シグナル: 売り)'; }
-  else if (rsi < 30) { rsiSig.className='ind-signal signal-buy'; rsiSig.textContent='買われ過ぎ (シグナル: 買い)'; }
-  else { rsiSig.className='ind-signal signal-neutral'; rsiSig.textContent='中立ゾーン'; }
+  if (rsi > 70) { rsiSig.className = 'signal signal-sell'; rsiSig.textContent = '買われ過ぎ → 売りシグナル'; }
+  else if (rsi < 30) { rsiSig.className = 'signal signal-buy'; rsiSig.textContent = '売られ過ぎ → 買いシグナル'; }
+  else { rsiSig.className = 'signal signal-neutral'; rsiSig.textContent = '中立ゾーン (' + rsi.toFixed(1) + ')'; }
 
+  // MACD
   const ema12 = calcEMA(priceHistory, 12);
   const ema26 = calcEMA(priceHistory, 26);
   const macdVal = ema12 - ema26;
-  document.getElementById('macd-val').textContent = Math.round(macdVal).toLocaleString('ja-JP');
+  document.getElementById('macd-val').textContent = fmtSmall(macdVal);
   const macdSig = document.getElementById('macd-signal');
-  if (macdVal > 0) { macdSig.className='ind-signal signal-buy'; macdSig.textContent='ゴールデンクロス傾向'; }
-  else { macdSig.className='ind-signal signal-sell'; macdSig.textContent='デッドクロス傾向'; }
+  if (macdVal > 0) { macdSig.className = 'signal signal-buy'; macdSig.textContent = 'ゴールデンクロス傾向'; }
+  else { macdSig.className = 'signal signal-sell'; macdSig.textContent = 'デッドクロス傾向'; }
 
+  // BB
   const bb = calcBB(priceHistory);
   if (bb) {
     document.getElementById('bb-upper').textContent = fmt(bb.upper);
     document.getElementById('bb-mid').textContent = fmt(bb.mid);
     document.getElementById('bb-lower').textContent = fmt(bb.lower);
+    const p = currentPrice || priceHistory[priceHistory.length - 1];
     const bbSig = document.getElementById('bb-signal');
-    const p = currentPrice || priceHistory[priceHistory.length-1];
-    if (p > bb.upper) { bbSig.className='ind-signal signal-sell'; bbSig.textContent='上限超え → 過熱注意'; }
-    else if (p < bb.lower) { bbSig.className='ind-signal signal-buy'; bbSig.textContent='下限割れ → 反発注意'; }
-    else { bbSig.className='ind-signal signal-neutral'; bbSig.textContent='バンド内 (通常)'; }
+    if (p > bb.upper) { bbSig.className = 'signal signal-sell'; bbSig.textContent = '上限超え → 過熱注意'; }
+    else if (p < bb.lower) { bbSig.className = 'signal signal-buy'; bbSig.textContent = '下限割れ → 反発注意'; }
+    else { bbSig.className = 'signal signal-neutral'; bbSig.textContent = 'バンド内 (通常レンジ)'; }
   }
 
+  // MA
   const ma5 = calcMA(priceHistory, 5);
   const ma25 = calcMA(priceHistory, 25);
   const ma75 = calcMA(priceHistory, 75);
@@ -293,77 +394,99 @@ function updateIndicators() {
   document.getElementById('ma75').textContent = fmt(ma75);
   const maSig = document.getElementById('ma-signal');
   if (ma5 && ma25) {
-    if (ma5 > ma25) { maSig.className='ind-signal signal-buy'; maSig.textContent='短期 > 長期 (上昇傾向)'; }
-    else { maSig.className='ind-signal signal-sell'; maSig.textContent='短期 < 長期 (下降傾向)'; }
+    if (ma5 > ma25) { maSig.className = 'signal signal-buy'; maSig.textContent = '短期 > 長期 (上昇傾向)'; }
+    else { maSig.className = 'signal signal-sell'; maSig.textContent = '短期 < 長期 (下降傾向)'; }
   }
 }
 
-function updateCharts(labels) {
-  const isDark = matchMedia('(prefers-color-scheme: dark)').matches;
-  const lbArr = labels || priceHistory.map((_, i) => i % 5 === 0 ? i + '' : '');
+function isDark() {
+  return matchMedia('(prefers-color-scheme: dark)').matches;
+}
 
+function renderPriceChart(labels) {
   const ma5Data = priceHistory.map((_, i, a) => {
     if (i < 4) return null;
-    return a.slice(i-4, i+1).reduce((s,v)=>s+v,0)/5;
+    return a.slice(i - 4, i + 1).reduce((s, v) => s + v, 0) / 5;
   });
+
+  const dark = isDark();
+  const gridColor = dark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)';
+  const tickColor = dark ? '#666' : '#aaa';
 
   if (!priceChart) {
     const ctx = document.getElementById('priceChart').getContext('2d');
     priceChart = new Chart(ctx, {
       type: 'line',
       data: {
-        labels: lbArr,
+        labels: labels || priceHistory.map((_, i) => i),
         datasets: [
-          { label: 'BTC/JPY', data: priceHistory, borderColor: '#378add', backgroundColor: 'rgba(55,138,221,0.08)', borderWidth: 2, pointRadius: 0, fill: true, tension: 0.35 },
-          { label: 'MA5', data: ma5Data, borderColor: '#1d9e75', borderWidth: 1.5, pointRadius: 0, fill: false, tension: 0.35, borderDash: [4,3] }
+          {
+            label: 'BTC/JPY', data: priceHistory,
+            borderColor: '#378add', backgroundColor: 'rgba(55,138,221,0.07)',
+            borderWidth: 2, pointRadius: 0, fill: true, tension: 0.35
+          },
+          {
+            label: 'MA5', data: ma5Data,
+            borderColor: '#1d9e75', borderWidth: 1.5,
+            pointRadius: 0, fill: false, tension: 0.35,
+            borderDash: [4, 3]
+          }
         ]
       },
       options: {
         responsive: true, maintainAspectRatio: false,
-        plugins: { legend: { display: false } },
+        plugins: { legend: { display: false }, tooltip: {
+          mode: 'index', intersect: false,
+          callbacks: { label: ctx => ' ' + fmt(ctx.raw) }
+        }},
         scales: {
-          x: { ticks: { color: isDark ? '#888' : '#888', font: { size: 10 }, maxTicksLimit: 8, autoSkip: true }, grid: { color: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)' } },
-          y: { ticks: { color: isDark ? '#888' : '#888', font: { size: 10 }, callback: v => (v/1000000).toFixed(1) + 'M' }, grid: { color: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)' } }
+          x: { ticks: { color: tickColor, font: { size: 10 }, maxTicksLimit: 8, autoSkip: true }, grid: { color: gridColor } },
+          y: { ticks: { color: tickColor, font: { size: 10 }, callback: v => '¥' + (v / 1000000).toFixed(1) + 'M' }, grid: { color: gridColor } }
         },
-        interaction: { mode: 'index', intersect: false }
+        animation: { duration: 300 }
       }
     });
   } else {
-    priceChart.data.labels = lbArr;
+    priceChart.data.labels = labels || priceHistory.map((_, i) => i);
     priceChart.data.datasets[0].data = priceHistory;
     priceChart.data.datasets[1].data = ma5Data;
     priceChart.update('none');
   }
+}
 
+function renderMacdChart() {
   const macdHistory = priceHistory.map((_, i, a) => {
     if (i < 25) return 0;
-    const slice = a.slice(0, i+1);
+    const slice = a.slice(0, i + 1);
     return calcEMA(slice, 12) - calcEMA(slice, 26);
   });
   const recent = macdHistory.slice(-20);
-  const macdColors = recent.map(v => v >= 0 ? '#1d9e75' : '#e24b4a');
+  const colors = recent.map(v => v >= 0 ? '#1d9e75' : '#e24b4a');
 
   if (!macdChart) {
     const ctx2 = document.getElementById('macdChart').getContext('2d');
     macdChart = new Chart(ctx2, {
       type: 'bar',
-      data: { labels: recent.map((_,i)=>''), datasets: [{ data: recent, backgroundColor: macdColors, borderWidth: 0 }] },
+      data: { labels: recent.map(() => ''), datasets: [{ data: recent, backgroundColor: colors, borderWidth: 0 }] },
       options: {
         responsive: true, maintainAspectRatio: false,
         plugins: { legend: { display: false }, tooltip: { enabled: false } },
-        scales: { x: { display: false }, y: { display: false } }
+        scales: { x: { display: false }, y: { display: false } },
+        animation: { duration: 200 }
       }
     });
   } else {
     macdChart.data.datasets[0].data = recent;
-    macdChart.data.datasets[0].backgroundColor = macdColors;
+    macdChart.data.datasets[0].backgroundColor = colors;
     macdChart.update('none');
   }
 }
 
 function setTF(tf) {
   currentTF = tf;
-  document.querySelectorAll('.tf-btn').forEach(b => b.classList.toggle('active', b.textContent.includes(tf === '1m' ? '1分' : tf === '5m' ? '5分' : tf === '1h' ? '1時間' : '日足')));
+  ['1m', '5m', '1h', '1d'].forEach(t => {
+    document.getElementById('tf-' + t).classList.toggle('active', t === tf);
+  });
   priceHistory = [];
   fetchHistory();
 }
@@ -371,53 +494,81 @@ function setTF(tf) {
 function addAlert() {
   const dir = document.getElementById('alert-dir').value;
   const price = parseFloat(document.getElementById('alert-price').value);
-  if (!price || isNaN(price)) { showToast('価格を入力してください'); return; }
-  alerts.push({ dir, price, id: Date.now() });
-  document.getElementById('alert-price').value = '';
+  if (!price || isNaN(price) || price <= 0) { showToast('価格を正しく入力してください'); return; }
+  alerts.push({ dir, price, id: Date.now(), triggered: false });
+  saveAlerts();
   renderAlerts();
-  showToast('アラートを設定しました (' + Math.round(price).toLocaleString('ja-JP') + '円)');
+  document.getElementById('alert-price').value = '';
+  showToast('アラート設定: ' + fmt(price) + (dir === 'above' ? ' 上回ったら' : ' 下回ったら'));
 }
 
 function removeAlert(id) {
   alerts = alerts.filter(a => a.id !== id);
+  saveAlerts();
   renderAlerts();
+}
+
+function saveAlerts() {
+  try { localStorage.setItem('btc_alerts', JSON.stringify(alerts)); } catch (e) {}
 }
 
 function renderAlerts() {
   const el = document.getElementById('alert-list');
-  if (!alerts.length) { el.innerHTML = '<div style="font-size:13px;color:var(--color-text-tertiary);text-align:center;padding:8px;">アラートはまだ設定されていません</div>'; return; }
+  if (!alerts.length) {
+    el.innerHTML = '<div class="empty-hint">アラートはまだ設定されていません</div>';
+    return;
+  }
   el.innerHTML = alerts.map(a => `
-    <div class="alert-item">
+    <div class="alert-item ${a.triggered ? 'alert-triggered' : ''}">
       <div class="alert-left">
-        <span class="alert-dir ${a.dir}">${a.dir==='above'?'↑ 上回ったら':'↓ 下回ったら'}</span>
-        <span class="alert-price">${Math.round(a.price).toLocaleString('ja-JP')}円</span>
+        <span class="alert-dir ${a.dir}">${a.dir === 'above' ? '↑ 上回ったら' : '↓ 下回ったら'}</span>
+        <span style="font-weight:500;">${fmt(a.price)}</span>
+        ${a.triggered ? '<span style="font-size:11px;color:var(--text3);">✓ 発動済み</span>' : ''}
       </div>
-      <button class="alert-del" onclick="removeAlert(${a.id})" title="削除"><i class="ti ti-x" aria-hidden="true"></i></button>
+      <button class="alert-del" onclick="removeAlert(${a.id})" title="削除">×</button>
     </div>
   `).join('');
 }
 
 function checkAlerts(price) {
+  let triggered = false;
   alerts.forEach(a => {
     if (a.triggered) return;
-    if (a.dir === 'above' && price >= a.price) { a.triggered = true; showToast('🔔 アラート! BTC が ' + Math.round(a.price).toLocaleString('ja-JP') + '円を上回りました'); }
-    if (a.dir === 'below' && price <= a.price) { a.triggered = true; showToast('🔔 アラート! BTC が ' + Math.round(a.price).toLocaleString('ja-JP') + '円を下回りました'); }
+    if (a.dir === 'above' && price >= a.price) {
+      a.triggered = true; triggered = true;
+      showToast('🔔 ' + fmt(a.price) + ' を上回りました！');
+    }
+    if (a.dir === 'below' && price <= a.price) {
+      a.triggered = true; triggered = true;
+      showToast('🔔 ' + fmt(a.price) + ' を下回りました！');
+    }
   });
+  if (triggered) { saveAlerts(); renderAlerts(); }
 }
 
+let toastTimer = null;
 function showToast(msg) {
-  const t = document.getElementById('toast');
-  t.textContent = msg;
-  t.style.display = 'block';
-  setTimeout(() => t.style.display = 'none', 3000);
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.style.display = 'block';
+  if (toastTimer) clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.style.display = 'none', 3500);
 }
 
-function refreshData() {
-  fetchPrice();
-  fetchHistory();
+async function refreshAll() {
+  await fetchHistory();
+  await fetchPrice();
 }
 
+function startAutoRefresh() {
+  if (refreshTimer) clearInterval(refreshTimer);
+  refreshTimer = setInterval(fetchPrice, 30000);
+}
+
+// init
 renderAlerts();
-fetchHistory().then(() => fetchPrice());
-refreshInterval = setInterval(fetchPrice, 30000);
+refreshAll();
+startAutoRefresh();
 </script>
+</body>
+</html>
